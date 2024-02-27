@@ -1,0 +1,121 @@
+Resources:
+  #NoSQL DynamoDB criation. Properties: ID and Note.
+  myDynamoDBTable: 
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      AttributeDefinitions: 
+        - 
+          AttributeName: "Id"
+          AttributeType: "N"
+        - 
+          AttributeName: "Note"
+          AttributeType: "N"
+      KeySchema: 
+        - 
+          AttributeName: "Id"
+          KeyType: "HASH"
+        - 
+          AttributeName: "Note"
+          KeyType: "RANGE"
+      ProvisionedThroughput: 
+        ReadCapacityUnits: "1"
+        WriteCapacityUnits: "1"
+      TableName: "MyClassNotes"
+      GlobalSecondaryIndexes: 
+        - 
+          IndexName: "GSI"
+          KeySchema: 
+            - 
+              AttributeName: "Id"
+              KeyType: "HASH"
+            - 
+              AttributeName: "Note"
+              KeyType: "RANGE"
+          Projection: 
+            NonKeyAttributes:
+              - "Note"
+            ProjectionType: "INCLUDE"
+          ProvisionedThroughput: 
+            ReadCapacityUnits: "1"
+            WriteCapacityUnits: "1"
+        - 
+          IndexName: "GSI2"
+          KeySchema: 
+            - 
+              AttributeName: "Id"
+              KeyType: "HASH"
+            - 
+              AttributeName: "Note"
+              KeyType: "RANGE"
+          Projection: 
+            NonKeyAttributes: 
+              - "Note"
+            ProjectionType: "INCLUDE"
+          ProvisionedThroughput: 
+            ReadCapacityUnits: "1"
+            WriteCapacityUnits: "1"
+      LocalSecondaryIndexes: 
+        - 
+          IndexName: "LSI"
+          KeySchema: 
+            - 
+              AttributeName: "Id"
+              KeyType: "HASH"
+            - 
+              AttributeName: "Note"
+              KeyType: "RANGE"
+          Projection: 
+            NonKeyAttributes:
+              - "Note"
+            ProjectionType: "INCLUDE"
+            
+  #Lambda Creation
+  MyLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: MyLambdaFunction
+      Runtime: Python3
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+            import json
+            import boto3
+            client = boto3.client('dynamodb')
+
+            def handler(event, context):
+                PutItem = client.put_item(
+                TableName='MyClassNotes',
+                Item={
+                        "Id": {
+                        "N": "1"
+                    },
+                        "Note": {
+                        "N": "1"
+                    }
+                }
+            )
+  #Lambda Execution and permissions
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: LambdaExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                Resource: !GetAtt myDynamoDBTable.Arn
+
+    
+            
