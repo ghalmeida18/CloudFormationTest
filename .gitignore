@@ -1,0 +1,9 @@
+﻿################################################################################
+# Este arquivo .gitignore foi criado automaticamente pelo Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs/CloudFormationTest/FileContentIndex/97158263-3d41-4457-b1ef-e0972ab1e8c1.vsidx
+/.vs/CloudFormationTest/v17/TestStore/0/000.testlog
+/.vs/CloudFormationTest/v17/TestStore/0/testlog.manifest
+/.vs/slnx.sqlite
+*.vsidx
