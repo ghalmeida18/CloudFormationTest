@@ -7,3 +7,5 @@
 /.vs/CloudFormationTest/v17/TestStore/0/testlog.manifest
 /.vs/slnx.sqlite
 *.vsidx
+/.vs/CloudFormationTest/v17
+*.json
