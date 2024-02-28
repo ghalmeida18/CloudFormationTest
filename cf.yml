@@ -67,14 +67,13 @@ Resources:
           Projection: 
             NonKeyAttributes:
               - "Note"
-            ProjectionType: "INCLUDE"
-            
+            ProjectionType: "INCLUDE"      
   #Lambda Creation
   MyLambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: MyLambdaFunction
-      Runtime: Python3
+      Runtime: python3.9
       Handler: index.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
@@ -116,6 +115,35 @@ Resources:
                 Action:
                   - dynamodb:PutItem
                 Resource: !GetAtt myDynamoDBTable.Arn
-
+  #Topic definition
+  Topic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: !Sub 'example-sns-topic'
+      TopicName: !Sub 'example-sns-topic'
+      Subscription:
+        - Protocol: lambda
+          Endpoint: !GetAtt MyLambdaFunction.Arn
+  #Invoke permission        
+  ExampleFunctionInvokePermission: 
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !Ref MyLambdaFunction
+      Principal: sns.amazonaws.com
+  #Topic policy      
+  ExampleTopicPolicy:      
+    Type: 'AWS::SNS::TopicPolicy'
+    Properties:
+      Topics:
+        - !Ref Topic
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: 'sns:Publish'
+            Resource: !Ref Topic
+            Principal:
+              AWS: '*'      
     
             
