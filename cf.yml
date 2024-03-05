@@ -67,7 +67,12 @@ Resources:
           Projection: 
             NonKeyAttributes:
               - "Note"
-            ProjectionType: "INCLUDE"      
+            ProjectionType: "INCLUDE"
+  #Define DLQ
+  ReceivedRequestsSNSDLQ:
+     Type: AWS::SQS::Queue
+     Properties:
+       QueueName: 'MyDeadLetterQueue'
   #Lambda Creation
   MyLambdaFunction:
     Type: AWS::Lambda::Function
@@ -76,6 +81,8 @@ Resources:
       Runtime: python3.9
       Handler: index.handler
       Role: !GetAtt LambdaExecutionRole.Arn
+      DeadLetterConfig:
+        TargetArn: !GetAtt ReceivedRequestsSNSDLQ.Arn
       Code:
         ZipFile: |
             import json
@@ -94,6 +101,7 @@ Resources:
                     }
                 }
             )
+  
   #Lambda Execution and permissions
   LambdaExecutionRole:
     Type: AWS::IAM::Role
@@ -115,6 +123,16 @@ Resources:
                 Action:
                   - dynamodb:PutItem
                 Resource: !GetAtt myDynamoDBTable.Arn
+        - PolicyName: SQSAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                  - sqs:GetQueueAttributes
+                  - sqs:ChangeMessageVisibility
+                Resource: !GetAtt ReceivedRequestsSNSDLQ.Arn
   #Topic definition
   Topic:
     Type: AWS::SNS::Topic
