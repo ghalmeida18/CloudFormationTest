@@ -1,88 +1,49 @@
 Resources:
   #NoSQL DynamoDB criation. Properties: ID and Note.
-  myDynamoDBTable: 
+  temperatureTable: 
     Type: AWS::DynamoDB::Table
-    Properties: 
-      AttributeDefinitions: 
-        - 
-          AttributeName: "Id"
-          AttributeType: "N"
-        - 
-          AttributeName: "Note"
-          AttributeType: "N"
-      KeySchema: 
-        - 
-          AttributeName: "Id"
-          KeyType: "HASH"
-        - 
-          AttributeName: "Note"
-          KeyType: "RANGE"
-      ProvisionedThroughput: 
-        ReadCapacityUnits: "1"
-        WriteCapacityUnits: "1"
-      TableName: "MyClassNotes"
-      GlobalSecondaryIndexes: 
-        - 
-          IndexName: "GSI"
-          KeySchema: 
-            - 
-              AttributeName: "Id"
-              KeyType: "HASH"
-            - 
-              AttributeName: "Note"
-              KeyType: "RANGE"
-          Projection: 
-            NonKeyAttributes:
-              - "Note"
-            ProjectionType: "INCLUDE"
-          ProvisionedThroughput: 
-            ReadCapacityUnits: "1"
-            WriteCapacityUnits: "1"
-        - 
-          IndexName: "GSI2"
-          KeySchema: 
-            - 
-              AttributeName: "Id"
-              KeyType: "HASH"
-            - 
-              AttributeName: "Note"
-              KeyType: "RANGE"
-          Projection: 
-            NonKeyAttributes: 
-              - "Note"
-            ProjectionType: "INCLUDE"
-          ProvisionedThroughput: 
-            ReadCapacityUnits: "1"
-            WriteCapacityUnits: "1"
-      LocalSecondaryIndexes: 
-        - 
-          IndexName: "LSI"
-          KeySchema: 
-            - 
-              AttributeName: "Id"
-              KeyType: "HASH"
-            - 
-              AttributeName: "Note"
-              KeyType: "RANGE"
-          Projection: 
-            NonKeyAttributes:
-              - "Note"
-            ProjectionType: "INCLUDE"
+    Properties:
+     AttributeDefinitions:
+       - AttributeName: id
+         AttributeType: S
+       - AttributeName: sender_id
+         AttributeType: S
+       - AttributeName: temperature
+         AttributeType: S
+     KeySchema:
+       - AttributeName: id
+         KeyType: HASH
+       - AttributeName: sender_id
+         KeyType: RANGE
+     ProvisionedThroughput:
+       ReadCapacityUnits: "1"
+       WriteCapacityUnits: "1"
+     TableName: "Temperatures"
+     GlobalSecondaryIndexes:
+       - IndexName: myGSI
+         KeySchema:
+           - AttributeName: temperature
+             KeyType: HASH
+         Projection:
+           ProjectionType: KEYS_ONLY
+         ProvisionedThroughput:
+           ReadCapacityUnits: "1"
+           WriteCapacityUnits: "1"
   #Define DLQ
-  ReceivedRequestsSNSDLQ:
+  SNSDLQ:
      Type: AWS::SQS::Queue
      Properties:
        QueueName: 'MyDeadLetterQueue'
   #Lambda Creation
-  MyLambdaFunction:
+  LambdaTemperatureProcessing:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: MyLambdaFunction
+      FunctionName: LambdaTemperatureProcessing
       Runtime: python3.9
       Handler: index.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       DeadLetterConfig:
-        TargetArn: !GetAtt ReceivedRequestsSNSDLQ.Arn
+        TargetArn: !GetAtt SNSDLQ.Arn
       Code:
         ZipFile: |
             import json
@@ -90,17 +51,16 @@ Resources:
             client = boto3.client('dynamodb')
 
             def handler(event, context):
+                message = json.loads(event['Records'][0]['Sns']['Message'])
                 PutItem = client.put_item(
-                TableName='MyClassNotes',
+                TableName='Temperatures',
                 Item={
-                        "Id": {
-                        "N": "1"
-                    },
-                        "Note": {
-                        "N": "1"
-                    }
+                        "id": { "S": message["id"] },
+                        "sender_id": { "S": message["sender_id"] },
+                        "Temperature": { "S": message["temperature"] }
                 }
             )
+
   
   #Lambda Execution and permissions
   LambdaExecutionRole:
@@ -122,7 +82,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - dynamodb:PutItem
-                Resource: !GetAtt myDynamoDBTable.Arn
+                Resource: !GetAtt temperatureTable.Arn
         - PolicyName: SQSAccess
           PolicyDocument:
             Version: '2012-10-17'
@@ -132,7 +92,15 @@ Resources:
                   - sqs:SendMessage
                   - sqs:GetQueueAttributes
                   - sqs:ChangeMessageVisibility
-                Resource: !GetAtt ReceivedRequestsSNSDLQ.Arn
+                Resource: !GetAtt SNSDLQ.Arn
+        - PolicyName: LogsAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:*
+                Resource: 'arn:aws:logs:*:*:*'
   #Topic definition
   Topic:
     Type: AWS::SNS::Topic
@@ -141,16 +109,16 @@ Resources:
       TopicName: !Sub 'example-sns-topic'
       Subscription:
         - Protocol: lambda
-          Endpoint: !GetAtt MyLambdaFunction.Arn
+          Endpoint: !GetAtt LambdaTemperatureProcessing.Arn
   #Invoke permission        
-  ExampleFunctionInvokePermission: 
+  functionExecutionRole: 
     Type: 'AWS::Lambda::Permission'
     Properties:
       Action: 'lambda:InvokeFunction'
-      FunctionName: !Ref MyLambdaFunction
+      FunctionName: !Ref LambdaTemperatureProcessing
       Principal: sns.amazonaws.com
   #Topic policy      
-  ExampleTopicPolicy:      
+  topicPolicy:      
     Type: 'AWS::SNS::TopicPolicy'
     Properties:
       Topics:
@@ -162,6 +130,6 @@ Resources:
             Action: 'sns:Publish'
             Resource: !Ref Topic
             Principal:
-              AWS: '*'      
+              AWS: '*'        
     
             
